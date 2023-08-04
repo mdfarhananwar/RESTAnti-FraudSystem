@@ -6,18 +6,18 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 
 @Entity
-public class StolenCard {
+public class IpAddress {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String number;
+    private String ip;
 
-    public StolenCard() {
+    public IpAddress(Long id, String ip) {
+        this.id = id;
+        this.ip = ip;
     }
 
-    public StolenCard(Long id, String number) {
-        this.id = id;
-        this.number = number;
+    public IpAddress() {
     }
 
     public Long getId() {
@@ -28,19 +28,19 @@ public class StolenCard {
         this.id = id;
     }
 
-    public String getNumber() {
-        return number;
+    public String getIp() {
+        return ip;
     }
 
-    public void setNumber(String number) {
-        this.number = number;
+    public void setIp(String ip) {
+        this.ip = ip;
     }
 
     @Override
     public String toString() {
-        return "StolenCard{" +
+        return "IpAddress{" +
                 "id=" + id +
-                ", number='" + number + '\'' +
+                ", ip='" + ip + '\'' +
                 '}';
     }
 }

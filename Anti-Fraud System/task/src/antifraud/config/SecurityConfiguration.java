@@ -106,6 +106,10 @@ import org.springframework.security.web.SecurityFilterChain;
                             .requestMatchers(HttpMethod.PUT,"/api/auth/role").hasRole("ADMINISTRATOR")
                             .requestMatchers(HttpMethod.PUT,"/api/auth/access").hasRole("ADMINISTRATOR")
                             .requestMatchers(HttpMethod.POST,"/api/antifraud/transaction").hasRole("MERCHANT")
+                            .requestMatchers("/api/antifraud/suspicious-ip").hasRole("SUPPORT")
+                            .requestMatchers("/api/antifraud/stolencard/{number}").hasRole("SUPPORT")
+                            .requestMatchers("/api/antifraud/stolencard").hasRole("SUPPORT")
+                            .requestMatchers("/api/antifraud/suspicious-ip/{ip}").hasRole("SUPPORT")
                     )
                     .sessionManagement(sessionManagement -> sessionManagement
                             .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
