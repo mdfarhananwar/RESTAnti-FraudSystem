@@ -16,7 +16,7 @@ import java.util.List;
 @Service
 public class IpAddressServices {
 
-    private IpAddressRepository ipAddressRepository;
+    private final IpAddressRepository ipAddressRepository;
 
     @Autowired
     public IpAddressServices(IpAddressRepository ipAddressRepository) {
@@ -26,9 +26,8 @@ public class IpAddressServices {
     @Transactional
     public ResponseEntity<IpAddress> saveSuspiciousIp(IpRequest ipRequest) {
         String ip = ipRequest.getIp();
-        IpAddress checkIpAddress = ipAddressRepository.findByIp(ip);
 
-        if (!isValidIpAddress(ip)) {
+        if (isIpNotValid(ip)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
 
@@ -47,7 +46,7 @@ public class IpAddressServices {
     public ResponseEntity<DeleteResponse> deleteIpAddress(String ip) {
         System.out.println("Enter");
 
-        if (!isValidIpAddress(ip)) {
+        if (isIpNotValid(ip)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
         if (!ipAddressRepository.existsByIp(ip)) {
@@ -61,35 +60,36 @@ public class IpAddressServices {
 
     public ResponseEntity<List<IpAddress>> getListOfSuspiciousIp() {
         List<IpAddress> listOfSuspiciousIp = ipAddressRepository.findAllByOrderByIdAsc();
-        if (listOfSuspiciousIp.isEmpty() || listOfSuspiciousIp.size() == 0) {
+        if (listOfSuspiciousIp.isEmpty()) {
             return ResponseEntity.ok(Collections.emptyList());
         }
         return ResponseEntity.ok(listOfSuspiciousIp);
     }
 
-    public boolean isValidIpAddress(String ip) {
+    public boolean isIpNotValid(String ip) {
         if (ip == null || ip.equals("")) {
-            return false;
+            return true;
         }
         String[] parts = ip.split("\\.");
 
         if (parts.length != 4) {
-            return false;
+            return true;
         }
 
         for (String part : parts) {
             try {
                 int num = Integer.parseInt(part);
                 if (num < 0 || num > 255) {
-                    return false;
+                    return true;
                 }
             } catch (NumberFormatException e) {
-                return false;
+                return true;
             }
         }
 
-        return true;
+        return false;
     }
+
     public boolean isIpSuspicious(String ip) {
         return ipAddressRepository.existsByIp(ip);
     }

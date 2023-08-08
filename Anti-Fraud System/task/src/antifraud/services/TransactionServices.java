@@ -79,7 +79,6 @@ public class TransactionServices {
     }
 
     @Transactional
-
     public ResponseEntity<Transaction> updateTransactionFeedback(TransactionRequestFeedback requestFeedback) {
         Long id = requestFeedback.getTransactionId();
         Optional<Transaction> checkTransaction = transactionRepository.findById(id);
@@ -158,10 +157,10 @@ public class TransactionServices {
     }
 
     public ResponseEntity<List<Transaction>> getTransactionByNumber(String number) {
-        if (!stolenCardServices.isValidCardNumber(number)) {
+        if (stolenCardServices.isCardNotValid(number)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
-        if (!stolenCardServices.isCardStolen(number)) {
+        if (stolenCardServices.isCardNotStolen(number)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
         List<Transaction> transactionList = transactionRepository.findAllByNumber(number);
@@ -228,8 +227,8 @@ public class TransactionServices {
     }
 
     private boolean isIllegalTransaction() {
-        return !ipAddressServices.isValidIpAddress(request.getIp())
-                || !stolenCardServices.isValidCardNumber(request.getNumber())
+        return ipAddressServices.isIpNotValid(request.getIp())
+                || stolenCardServices.isCardNotValid(request.getNumber())
                 || !isValidAmount(request.getAmount())
                 || !isValidDate(request.getDate())
                 || !isValidRegion(request.getRegion());
@@ -251,7 +250,7 @@ public class TransactionServices {
     }
 
     private Result getResultByCardNumber() {
-        return !stolenCardServices.isCardStolen(request.getNumber()) ? Result.ALLOWED
+        return stolenCardServices.isCardNotStolen(request.getNumber()) ? Result.ALLOWED
                 : Result.PROHIBITED;
     }
 

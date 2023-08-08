@@ -25,7 +25,7 @@ public class StolenCardServices {
     @Transactional
     public ResponseEntity<StolenCard> saveStolenCard(StolenCardRequest stolenCardRequest) {
         String number = stolenCardRequest.getNumber();
-        if (!isValidCardNumber(number)) {
+        if (isCardNotValid(number)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
         if (stolenCardRepository.existsByNumber(number)) {
@@ -41,7 +41,7 @@ public class StolenCardServices {
     @Transactional
     public ResponseEntity<DeleteResponse> deleteStolenCard(String number) {
 
-        if (!isValidCardNumber(number)) {
+        if (isCardNotValid(number)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
         if (!stolenCardRepository.existsByNumber(number)) {
@@ -59,7 +59,7 @@ public class StolenCardServices {
         return ResponseEntity.ok(listOfStolenCards);
     }
 
-    public boolean isValidCardNumber(String number) {
+    public boolean isCardNotValid(String number) {
         // Remove all non-digit characters from the input string
         String cleanedNumber = number.replaceAll("\\D", "");
 
@@ -81,16 +81,10 @@ public class StolenCardServices {
             alternate = !alternate;
         }
 
-        return sum % 10 == 0;
-    }
-    public StolenCard findCardByNumber(String number) {
-        return stolenCardRepository.findByNumber(number);
-    }
-    public StolenCard saveCard(StolenCard card) {
-        return stolenCardRepository.save(card);
+        return sum % 10 != 0;
     }
 
-    public boolean isCardStolen(String number) {
-        return stolenCardRepository.existsByNumber(number);
+    public boolean isCardNotStolen(String number) {
+        return !stolenCardRepository.existsByNumber(number);
     }
 }
