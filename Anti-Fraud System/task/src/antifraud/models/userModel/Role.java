@@ -1,7 +1,6 @@
 package antifraud.models.userModel;
 
 import jakarta.persistence.*;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 
 import java.util.Collection;
 import java.util.Objects;
@@ -82,8 +81,6 @@ public class Role {
 
     @Override
     public String toString() {
-        final StringBuilder builder = new StringBuilder();
-        builder.append("Role [name=").append(name).append("]").append("[id=").append(id).append("]");
-        return builder.toString();
+        return "Role [name=" + name + "]" + "[id=" + id + "]";
     }
 }

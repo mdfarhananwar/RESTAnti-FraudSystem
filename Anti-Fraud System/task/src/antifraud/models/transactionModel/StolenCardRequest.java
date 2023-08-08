@@ -6,7 +6,6 @@ public class StolenCardRequest {
     public StolenCardRequest() {
     }
 
-
     public String getNumber() {
         return number;
     }

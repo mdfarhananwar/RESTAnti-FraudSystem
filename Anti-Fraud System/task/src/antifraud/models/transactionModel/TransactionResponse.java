@@ -12,7 +12,6 @@ public class TransactionResponse {
         this.info = info;
     }
 
-
     public Result getResult() {
         return result;
     }

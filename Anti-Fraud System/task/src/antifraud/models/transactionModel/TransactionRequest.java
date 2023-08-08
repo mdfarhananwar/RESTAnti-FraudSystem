@@ -1,7 +1,6 @@
 package antifraud.models.transactionModel;
 
 import java.time.LocalDateTime;
-import java.util.Date;
 
 public class TransactionRequest {
     private Long amount;
@@ -12,7 +11,6 @@ public class TransactionRequest {
 
     public TransactionRequest() {
     }
-
 
     public TransactionRequest(Long amount, String ip, String number, Region region, LocalDateTime date) {
         this.amount = amount;

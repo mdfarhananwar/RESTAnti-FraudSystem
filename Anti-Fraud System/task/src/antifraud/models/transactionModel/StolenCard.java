@@ -13,13 +13,6 @@ public class StolenCard {
     private Long id;
     private String number;
 
-
-    @JsonIgnore
-    private int allowedLimit = 200;
-
-    @JsonIgnore
-    private int manualLimit = 1500;
-
     public StolenCard() {
     }
 
@@ -42,22 +35,6 @@ public class StolenCard {
 
     public void setNumber(String number) {
         this.number = number;
-    }
-
-    public int getAllowedLimit() {
-        return allowedLimit;
-    }
-
-    public void setAllowedLimit(int allowedLimit) {
-        this.allowedLimit = allowedLimit;
-    }
-
-    public int getManualLimit() {
-        return manualLimit;
-    }
-
-    public void setManualLimit(int manualLimit) {
-        this.manualLimit = manualLimit;
     }
 
     @Override

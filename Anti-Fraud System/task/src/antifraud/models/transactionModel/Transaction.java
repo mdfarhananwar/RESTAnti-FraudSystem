@@ -1,8 +1,9 @@
 package antifraud.models.transactionModel;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.persistence.*;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import java.time.LocalDateTime;
 
 @Entity
@@ -19,7 +20,6 @@ public class Transaction {
     private Feedback feedback;
     public Transaction() {
     }
-
 
     public Transaction(Long amount, String ip, String number, Region region, LocalDateTime date) {
         this.amount = amount;

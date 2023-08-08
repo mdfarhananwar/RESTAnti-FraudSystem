@@ -68,17 +68,12 @@ public class Privilege {
             return false;
         Privilege other = (Privilege) obj;
         if (getName() == null) {
-            if (other.getName() != null)
-                return false;
-        } else if (!getName().equals(other.getName()))
-            return false;
-        return true;
+            return other.getName() == null;
+        } else return getName().equals(other.getName());
     }
 
     @Override
     public String toString() {
-        final StringBuilder builder = new StringBuilder();
-        builder.append("Privilege [name=").append(name).append("]").append("[id=").append(id).append("]");
-        return builder.toString();
+        return "Privilege [name=" + name + "]" + "[id=" + id + "]";
     }
 }
