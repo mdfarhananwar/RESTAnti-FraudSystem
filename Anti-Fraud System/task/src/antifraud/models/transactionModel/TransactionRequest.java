@@ -1,36 +1,25 @@
 package antifraud.models.transactionModel;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.Date;
 
-@Entity
-public class Transaction {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long transactionId;
+public class TransactionRequest {
     private Long amount;
     private String ip;
     private String number;
     private Region region;
     private LocalDateTime date;
-    private Result result;
-    private Feedback feedback;
-    public Transaction() {
+
+    public TransactionRequest() {
     }
 
 
-    public Transaction(Long amount, String ip, String number, Region region, LocalDateTime date) {
+    public TransactionRequest(Long amount, String ip, String number, Region region, LocalDateTime date) {
         this.amount = amount;
         this.ip = ip;
         this.number = number;
         this.region = region;
         this.date = date;
-    }
-
-    public Long getTransactionId() {
-        return transactionId;
     }
 
     public Long getAmount() {
@@ -73,35 +62,14 @@ public class Transaction {
         this.date = date;
     }
 
-    public Result getResult() {
-        return result;
-    }
-
-    public void setResult(Result result) {
-        this.result = result;
-    }
-
-    public String getFeedback() {
-        if (feedback == null) {
-            return "";  // Return an empty string if feedback is null
-        }
-        return feedback.toString();  // Return the string representation of feedback
-    }
-
-    public void setFeedback(Feedback feedback) {
-        this.feedback = feedback;
-    }
-
-
     @Override
     public String toString() {
-        return "Transaction{" +
+        return "TransactionRequest{" +
                 "amount=" + amount +
                 ", ip='" + ip + '\'' +
                 ", number='" + number + '\'' +
-                ", region='" + region + '\'' +
+                ", region=" + region +
                 ", date=" + date +
                 '}';
     }
-
 }

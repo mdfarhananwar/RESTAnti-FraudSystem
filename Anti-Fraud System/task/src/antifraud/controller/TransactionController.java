@@ -1,28 +1,33 @@
 package antifraud.controller;
 
+import antifraud.dao.transactionDao.AppStatusRepository;
 import antifraud.models.transactionModel.*;
-import antifraud.models.userModel.Operation;
-import antifraud.models.userModel.User;
 import antifraud.services.IpAddressServices;
 import antifraud.services.StolenCardServices;
 import antifraud.services.TransactionServices;
 import antifraud.services.UserService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.neo4j.Neo4jProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 public class TransactionController {
+
+    int count = 1;
+    private boolean isFirstRequest = true;
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private AppStatusRepository appStatusRepository;
 
     @Autowired
     private IpAddressServices ipAddressServices;
@@ -32,49 +37,54 @@ public class TransactionController {
 
     @Autowired
     private TransactionServices transactionServices;
-    @PreAuthorize("MERCHANT")
+    //@PreAuthorize("MERCHANT")
     @PostMapping("/api/antifraud/transaction")
-    public ResponseEntity<?> validAmount(@RequestBody Transaction transaction, Authentication authentication) {
-        //System.out.println(transaction.toString());
-//        String authenticatedUsername = authentication.getName();
-//
-//        User authenticatedUser = userService.findUserByUsername(authenticatedUsername);String authenticatedRoleName = authenticatedUser.getRole().getName();
-//        System.out.println("Authenticated User: " + authenticatedUser.toString());
-//        Operation authenticatedOperation = authenticatedUser.getOperation();
-//        System.out.println(authenticatedUser.getOperation());
-//        System.out.println(authenticatedRoleName);
-//
-//        if ( transaction.getAmount() == null || transaction.getAmount() <= 0) {
-//            System.out.println("NULLIF");
+    public ResponseEntity<?> validAmount(@RequestBody TransactionRequest transaction, Authentication authentication) {
+        System.out.println("POSTMAPPING transaction");
+        //return transactionServices.validTransaction(transaction,authentication);
+        return transactionServices.processTransaction(transaction, authentication);
+
+    }
+
+    @GetMapping("/api/antifraud/history")
+    public ResponseEntity<List<Transaction>> getHistory() {
+        System.out.println("Enter HISTORY");
+
+        AppStatus appStatus = appStatusRepository.findById(1L).orElse(null);
+
+        if (appStatus == null) {
+            System.out.println("First Request");
+            appStatus = new AppStatus();
+            appStatus.setFirstRequest(true);
+            appStatusRepository.save(appStatus);
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+
+        return transactionServices.getListOfTransactions();
+    }
+
+
+    @GetMapping("/api/antifraud/history/{number}")
+    public ResponseEntity<List<Transaction>> getTransactionByNumber(@PathVariable String number) {
+        System.out.println("ENTER");
+        return transactionServices.getTransactionByNumber(number);
+    }
+
+    @PutMapping("/api/antifraud/transaction")
+    public ResponseEntity<Transaction> updateTransaction( @RequestBody TransactionRequestFeedback requestFeedback) {
+        System.out.println("PUTMAPPINg ENTER FEEDBACK");
+//        Feedback newFeedback = requestFeedback.getFeedback();
+//        if (!transactionServices.isValidFeedback(newFeedback)) {
 //            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-//        } else {
-//            if (authenticatedOperation.equals(Operation.UNLOCK)) {
-//                if (transaction.getAmount() <= 200 ) {
-//                    return ResponseEntity.ok(Map.of("result", "ALLOWED"));
-//                } else if (transaction.getAmount() <= 1500) {
-//                    return ResponseEntity.ok(Map.of("result", "MANUAL_PROCESSING"));
-//                } else {
-//                    System.out.println("PRHOBITEDDDDDDDDDDDDDDDDDD");
-//                    return ResponseEntity.ok(Map.of("result", "PROHIBITED"));
-//                }
-//            } else {
-//                if (transaction.getAmount() <= 200 ) {
-//                    System.out.println("transaction == 200");
-//                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("result", "ALLOWED"));
-//                } else if (transaction.getAmount() <= 1500) {
-//                    System.out.println("transaction==1500");
-//                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("result", "MANUAL_PROCESSING"));
-//
-//                } else {
-//                    System.out.println("PRHOBITEDDDDDDDDDDDDDDDDDD");
-//                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("result", "PROHIBITED"));
-//
-//                }
-//            }
-//
 //        }
-        return transactionServices.validTransaction(transaction,authentication);
-   }
+        return transactionServices.updateTransactionFeedback(requestFeedback);
+    }
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<String> handleInvalidEnumValue(HttpMessageNotReadableException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+    }
+
+
 
    @PostMapping("/api/antifraud/suspicious-ip")
    public ResponseEntity<IpAddress> saveSuspiciousIp(@RequestBody IpRequest ipRequest) {

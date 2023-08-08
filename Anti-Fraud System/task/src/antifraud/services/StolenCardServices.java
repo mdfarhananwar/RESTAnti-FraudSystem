@@ -83,6 +83,12 @@ public class StolenCardServices {
 
         return sum % 10 == 0;
     }
+    public StolenCard findCardByNumber(String number) {
+        return stolenCardRepository.findByNumber(number);
+    }
+    public StolenCard saveCard(StolenCard card) {
+        return stolenCardRepository.save(card);
+    }
 
     public boolean isCardStolen(String number) {
         return stolenCardRepository.existsByNumber(number);
