@@ -16,7 +16,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service("userDetailsService")
 @Transactional
@@ -33,12 +32,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         if (user == null) {
             throw new UsernameNotFoundException("Not found: " + username);
         }
-
-        System.out.println(user.toString());
-        System.out.println("USERDETAILSSERVICE");
         String roleWithPrefix = "ROLE_" + user.getRole().getName();
-        System.out.println(roleWithPrefix);
-        System.out.println("USERDETAILSSERVICEEXIT");
         List<SimpleGrantedAuthority> grantedAuthorities = Collections.singletonList(new SimpleGrantedAuthority(roleWithPrefix));
         return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), grantedAuthorities);
     }

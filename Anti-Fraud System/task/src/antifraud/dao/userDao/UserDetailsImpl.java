@@ -24,9 +24,6 @@ public class UserDetailsImpl implements UserDetails {
         this.username = user.getUsername();
         this.password = user.getPassword();
         String roleWithPrefix = "ROLE_" + user.getRole().getName();
-        System.out.println("ROlECHECKENTER");
-        System.out.println(roleWithPrefix);
-        System.out.println("ROlECHECKEXIT");
         rolesAndAuthorities = List.of(new SimpleGrantedAuthority(roleWithPrefix));
     }
     @Override
