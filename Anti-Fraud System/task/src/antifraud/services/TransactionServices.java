@@ -29,17 +29,134 @@ public class TransactionServices {
     private TransactionRequest request;
     private List<String> errors;
 
+
+
     @Autowired
-    public TransactionServices(UserService userService, IpAddressServices ipAddressServices,
-                               StolenCardServices stolenCardServices,
-                               TransactionRepository transactionRepository,
-                               CardRepository cardRepository) {
+    public TransactionServices(
+            UserService userService,
+            IpAddressServices ipAddressServices,
+            StolenCardServices stolenCardServices,
+            TransactionRepository transactionRepository,
+            CardRepository cardRepository) {
         this.userService = userService;
         this.ipAddressServices = ipAddressServices;
         this.stolenCardServices = stolenCardServices;
         this.transactionRepository = transactionRepository;
         this.cardRepository = cardRepository;
     }
+    /**
+     * Validate a transaction request based on transaction amount, IP address, and card number.
+     *
+     * @param request The transaction request object containing transaction details.
+     * @return ResponseEntity with the status and the result of the transaction validation.
+     */
+    public ResponseEntity<TransactionResponse> processTransaction(
+            TransactionRequest request,
+            Authentication authentication) {
+
+        // Set the request and initialize the errors list
+        this.authentication = authentication;
+        this.request = request;
+
+        // return response from helper method
+        return getValidatedTransaction(request);
+    }
+
+
+    /**
+     * Retrieve the transaction history sorted by transaction ID in ascending order.
+     *
+     * @return ResponseEntity with the status and the list of transaction history.
+     */
+    public ResponseEntity<List<Transaction>> getListOfTransactions() {
+        // Retrieve the transaction history sorted by transaction ID in ascending order
+        List<Transaction> transactionList = transactionRepository.findAllByOrderByTransactionIdAsc();
+
+        // Check if the history is empty, and respond accordingly
+        if (transactionList.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+
+        // Respond with the HTTP OK status (200) and the transaction history
+        return ResponseEntity.ok(transactionList);
+    }
+
+    /**
+     * Retrieve the transaction history for a specified card number.
+     *
+     * @param number The card number for which the transaction history is requested.
+     * @return ResponseEntity with the status and the list of transaction history for the specified card number.
+     */
+    public ResponseEntity<List<Transaction>> getTransactionByNumber(String number) {
+        // Check if the card number is not valid
+        if (stolenCardServices.isCardNotValid(number)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Check if the card number is not stolen
+        if (stolenCardServices.isCardNotStolen(number)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // Retrieve the transaction history for the specified card number from the repository
+        List<Transaction> transactionList = transactionRepository.findAllByNumber(number);
+
+        // Check if transactions were found for the card number
+        if (transactionList.isEmpty()) {
+            // Respond with the HTTP Not Found status (404) if no transactions were found
+            return ResponseEntity.notFound().build();
+        }
+
+        // Respond with the HTTP OK status (200) and the transaction history for the specified card number
+        return ResponseEntity.ok(transactionList);
+    }
+
+    /**
+     * Update feedback for a specific transaction and adjust transaction limits.
+     *
+     * @param requestFeedback The request object containing transaction ID and feedback.
+     * @return ResponseEntity with the status and the updated transaction details.
+     */
+    @Transactional
+    public ResponseEntity<Transaction> updateTransactionFeedback(TransactionRequestFeedback requestFeedback) {
+        // Retrieve the transaction ID from the request
+        Long id = requestFeedback.getTransactionId();
+
+        // Check if the transaction with the specified ID exists
+        Optional<Transaction> checkTransaction = transactionRepository.findById(id);
+
+        if (checkTransaction.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Transaction transaction = checkTransaction.get();
+        String newFeedback = requestFeedback.getFeedback();
+        Result currentResult = transaction.getResult();
+        String currentFeedback = transaction.getFeedback();
+
+        // Check if the new feedback is empty or has an invalid format
+        if (newFeedback.isEmpty() || !isValidFeedback(newFeedback)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Check if the transaction already has feedback
+        if (!currentFeedback.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+
+        // Check if the new feedback is the same as the current feedback or result
+        if (newFeedback.equals(currentFeedback) || newFeedback.equals(currentResult.toString())) {
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).build();
+        }
+
+        // Set the new feedback and adjust transaction limits
+        transaction.setFeedback(stringToFeedback(newFeedback));
+        changeLimit(transaction, newFeedback);
+
+        // Respond with the HTTP OK status (200) and the updated transaction details
+        return ResponseEntity.ok(transaction);
+    }
+
 
     public static boolean isValidAmount(Long amount) {
         return amount != null && amount > 0;
@@ -69,46 +186,9 @@ public class TransactionServices {
         return false;
     }
 
-    public ResponseEntity<List<Transaction>> getListOfTransactions() {
-        List<Transaction> transactionList = transactionRepository.findAllByOrderByTransactionIdAsc();
-        if (transactionList.isEmpty()) {
-            return ResponseEntity.ok(Collections.emptyList());
-        }
-        return ResponseEntity.ok(transactionList);
 
-    }
 
-    @Transactional
-    public ResponseEntity<Transaction> updateTransactionFeedback(TransactionRequestFeedback requestFeedback) {
-        Long id = requestFeedback.getTransactionId();
-        Optional<Transaction> checkTransaction = transactionRepository.findById(id);
 
-        if (checkTransaction.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-
-        Transaction transaction = checkTransaction.get();
-        String newFeedback = requestFeedback.getFeedback();
-        Result currentResult = transaction.getResult();
-        String currentFeedback = transaction.getFeedback();
-
-        if (newFeedback.isEmpty() || !isValidFeedback(newFeedback)) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        }
-
-        if (!currentFeedback.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).build();
-        }
-
-        if (newFeedback.toString().equals(currentFeedback) || newFeedback.equals(currentResult.toString())) {
-            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).build();
-        }
-
-        transaction.setFeedback(stringToFeedback(newFeedback));
-        changeLimit(transaction, newFeedback);
-
-        return ResponseEntity.ok(transaction);
-    }
 
     /**
      * Helper method to change the limit for a certain transaction based on the provided feedback.
@@ -150,45 +230,48 @@ public class TransactionServices {
         cardRepository.save(card);
     }
 
-    public ResponseEntity<TransactionResponse> processTransaction(TransactionRequest request, Authentication authentication) {
-        this.authentication = authentication;
-        this.request = request;
-        return getValidatedTransaction(request);
-    }
 
-    public ResponseEntity<List<Transaction>> getTransactionByNumber(String number) {
-        if (stolenCardServices.isCardNotValid(number)) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        }
-        if (stolenCardServices.isCardNotStolen(number)) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-        List<Transaction> transactionList = transactionRepository.findAllByNumber(number);
-        return ResponseEntity.ok(transactionList);
-    }
 
+    /**
+     * Helper method to Validate a transaction request based on transaction amount, IP address, and card number.
+     *
+     * @param request The transaction request object containing transaction details.
+     * @return ResponseEntity with the status and the result of the transaction validation.
+     */
     public ResponseEntity<TransactionResponse> getValidatedTransaction(TransactionRequest request) {
+        // Set the request and initialize the errors list
         this.request = request;
         this.errors = new ArrayList<>();
+
+        // Initialize variables for transaction validation
         Result result = Result.ALLOWED;
         Long maxAllowed = 200L;
         Long maxManual = 1500L;
         Long amount = request.getAmount();
+
+        // Get the authenticated user's information
         String authenticatedUsername = authentication.getName();
         User authenticatedUser = userService.findUserByUsername(authenticatedUsername);
         Operation authenticatedOperation = authenticatedUser.getOperation();
 
+        // Check if the transaction is illegal
         if (isIllegalTransaction()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
 
-        Transaction transaction = new Transaction(request.getAmount(), request.getIp(), request.getNumber(),
+        // Create a transaction object and save it
+        Transaction transaction = new Transaction(
+                request.getAmount(),
+                request.getIp(),
+                request.getNumber(),
                 request.getRegion(),
                 request.getDate());
         transaction = transactionRepository.save(transaction);
         Long savedTransactionId = transaction.getTransactionId();
         String savedNumber = transaction.getNumber();
         Card card = new Card();
+
+        // Check if the card number exists in the database
         if (!cardRepository.existsByNumber(savedNumber)) {
             card.setTransactionId(savedTransactionId); // Set the saved transactionId
             card.setNumber(savedNumber);
@@ -199,8 +282,9 @@ public class TransactionServices {
             maxManual = (long) card.getMaxManual();
         }
 
+        // Iterate through validation results for amount, maxAllowed, and maxManual
         for (String field : getAllResults(amount, maxAllowed, maxManual).keySet()) {
-
+            // Determine the transaction result based on validation results
             Result fieldResult = getAllResults(amount, maxAllowed, maxManual).get(field);
             if ((fieldResult == Result.MANUAL_PROCESSING && result == Result.PROHIBITED) ||
                     fieldResult == Result.ALLOWED) {
@@ -214,10 +298,16 @@ public class TransactionServices {
             result = fieldResult;
             this.errors.add(field);
         }
+
+        // Update the transaction result and save it
         transaction.setResult(result);
         transactionRepository.save(transaction);
+
+        // Get the error information
         String checkInfo = getInfo();
         if (result == Result.ALLOWED) checkInfo = "none";
+
+        // Respond based on the authenticated operation
         if (authenticatedOperation.equals(Operation.UNLOCK)) {
             return ResponseEntity.ok(new TransactionResponse(result, checkInfo));
         } else {
@@ -225,6 +315,11 @@ public class TransactionServices {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new TransactionResponse(result, checkInfo));
         }
     }
+
+
+
+// Helper methods
+
 
     private boolean isIllegalTransaction() {
         return ipAddressServices.isIpNotValid(request.getIp())

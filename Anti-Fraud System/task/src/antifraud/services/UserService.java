@@ -12,10 +12,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,34 +27,44 @@ public class UserService {
         this.roleService = roleService;
     }
 
+    /**
+     * Register a new user.
+     *
+     * @param user The user object containing name, username, and password.
+     * @return ResponseEntity with status and user information.
+     */
     public ResponseEntity<UserResponseDTO> registerUser(User user) {
-        User checkUser = findUserByUsername(user.getUsername());
-        if (user.getUsername() == null || user.getName() == null || user.getPassword() == null) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        } else if (checkUser != null) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).build();
-        } else {
-            user.setPassword(passwordEncoder().encode(user.getPassword()));
-            String roleName;
-            Operation operation;
-            if (count() == 0) {
-                roleName = "ADMINISTRATOR";
-                operation = Operation.UNLOCK;
-            } else {
-                roleName = "MERCHANT";
-                operation = Operation.LOCK;
-            }
-            Role role = new Role(roleName);
-            roleService.saveRole(role);
-            user.setRole(role);
-            user.setOperation(operation);
-            User savedUser = saveUser(user);
-            System.out.println(savedUser.toString());
-            UserResponseDTO userResponse = mapToUserResponseDTO(savedUser);
-            return ResponseEntity.status(HttpStatus.CREATED).body(userResponse);
+        // Check if any required fields are null
+        if (isInvalidUser(user)) {
+            return ResponseEntity.badRequest().build();
         }
+
+        // Check if the user already exists
+        if (userExists(user.getUsername())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+
+        // Encode the user's password
+        user.setPassword(encodePassword(user.getPassword()));
+
+        // Determine the role and operation for the user
+        String userRole = decideUserRole();
+
+        // Save the user in the database
+        User savedUser = saveUserWithRole(user, userRole);
+
+        // Create a UserResponseDTO from the saved user
+        UserResponseDTO userResponse = mapToUserResponseDTO(savedUser);
+
+        // Respond with HTTP CREATED and the user information
+        return ResponseEntity.status(HttpStatus.CREATED).body(userResponse);
     }
 
+    /**
+     * Get a list of all registered users.
+     *
+     * @return ResponseEntity with the status and a list of user responses.
+     */
     public ResponseEntity<List<UserResponseDTO>> getListOfUsers() {
         List<User> all = userRepository.findAll();
         List<UserResponseDTO> userResponses = all.stream()
@@ -66,53 +73,190 @@ public class UserService {
         return ResponseEntity.ok(userResponses);
     }
 
+
+    /**
+     * Update the role of a user.
+     *
+     * @param userRole The user role information containing username and role.
+     * @return ResponseEntity with status and user information.
+     */
     public ResponseEntity<UserResponseDTO> updateRole(UserRole userRole) {
-        User checkUser;
-
-        if (!existsByUsername(userRole.getUsername())) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        } else {
-            checkUser = findUserByUsername(userRole.getUsername());
+        // Check if the user exists
+        if (!userExists(userRole.getUsername())) {
+            return ResponseEntity.notFound().build();
         }
 
-        if (!userRole.getRole().equals("SUPPORT") && !userRole.getRole().equals("MERCHANT")) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        } else if (userRole.getRole().equals(checkUser.getRole().getName())) {
+        User existingUser = findUserByUsername(userRole.getUsername());
+        String newRoleName = userRole.getRole();
+
+        // Check if Role is valid (Either it is "SUPPORT" or "MERCHANT")
+        if (!isValidRole(newRoleName)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Check if assigned role is already provided to the user,
+        // respond with the HTTP Conflict status (409);
+        if (isRoleAlreadyAssigned(existingUser, newRoleName)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).build();
-        } else {
-            Role role = new Role(userRole.getRole());
-            roleService.saveRole(role);
-            checkUser.setRole(role);
-            saveUser(checkUser);
-            checkUser.getRole().setName(userRole.getRole());
-            return ResponseEntity.status(HttpStatus.OK).body(new UserResponseDTO(checkUser));
         }
+
+        //Update and Save the Role in the Database
+        Role newRole = new Role(newRoleName);
+        roleService.saveRole(newRole);
+
+        existingUser.setRole(newRole);
+        saveUser(existingUser);
+
+        // Update the role in the user response
+        existingUser.getRole().setName(newRoleName);
+
+        // Respond with HTTP OK and the updated user information
+        return ResponseEntity.ok(new UserResponseDTO(existingUser));
     }
 
-    public ResponseEntity<Map<String, String>> updateAccess(AccessRequest accessRequest, Authentication authentication) {
-        String username = accessRequest.getUsername();
+    /**
+     * Update user access (lock/unlock) based on the provided AccessRequest.
+     *
+     * @param accessRequest    The access request object containing username and operation.
+     * @param authentication   The authentication object for the currently logged-in user.
+     * @return ResponseEntity with the status and a response message.
+     */
+    public ResponseEntity<Map<String, String>> updateAccess(
+            AccessRequest accessRequest,
+            Authentication authentication
+    ) {
+        String targetUsername = accessRequest.getUsername();
         Operation operation = accessRequest.getOperation();
-        User checkedUser = findUserByUsername(username);
+
+        if (!userExists(targetUsername)) {
+            // User not found
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        // Get the username and role of the authenticated user
         String authenticatedUsername = authentication.getName();
         User authenticatedUser = findUserByUsername(authenticatedUsername);
-        String authenticatedRoleName = authenticatedUser.getRole().getName();
-        if (checkedUser == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-        String roleName = checkedUser.getRole().getName();
-        if (roleName.equals("ADMINISTRATOR") && operation == Operation.LOCK) {
+
+        // Check for invalid operations
+        if (isAdministratorLocked(targetUsername, operation)) {
+            // Administrators cannot be locked
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
-        if (operation == Operation.UNLOCK && !authenticatedRoleName.equals("ADMINISTRATOR")) {
+
+        if (isUnauthorizedUnlock(operation, authenticatedUser)) {
+            // Only administrators can unlock users
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        String status = operation == Operation.LOCK ? "locked" : "unlocked";
-        checkedUser.setOperation(operation);
-        saveUser(checkedUser);
-        Map<String, String> responseBody = new HashMap<>();
-        responseBody.put("status", "User " + username + " " + status + "!");
+
+        // Update the user's access operation (lock/unlock)
+        updateAccessOperation(targetUsername, operation);
+
+        // Get the response body from helper method
+        Map<String, String> responseBody = createResponse(operation, targetUsername);
+
+        // Respond with HTTP OK and the response body
         return ResponseEntity.status(HttpStatus.OK).body(responseBody);
     }
+
+    /**
+     * Delete a user by username.
+     *
+     * @param username The username of the user to be deleted.
+     * @return ResponseEntity with the status and a response message.
+     */
+    @Transactional
+    public ResponseEntity<UserResponseDelete> deleteUser(String username) {
+        // Check if the user exists
+        if (!userExists(username)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        User userToDelete = findUserByUsername(username);
+
+        // Check if the user is an administrator and cannot delete oneself
+        if (isAdmin(userToDelete)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        // Delete the user
+        userRepository.deleteByUsernameIgnoreCase(username);
+
+        // Prepare the response message
+        String responseMessage = "Deleted successfully!";
+        UserResponseDelete response = new UserResponseDelete(username, responseMessage);
+
+        // Respond with HTTP OK and the response body
+        return ResponseEntity.ok(response);
+    }
+
+    // Helper Methods :-----------------------------------------------------------------------------------------------
+
+    // Helper methods for method - registerUser
+
+    private boolean isInvalidUser(User user) {
+        return user.getUsername() == null || user.getName() == null || user.getPassword() == null;
+    }
+
+    private boolean userExists(String username) {
+        return userRepository.existsByUsernameIgnoreCase(username);
+    }
+
+    private String encodePassword(String password) {
+        return passwordEncoder().encode(password);
+    }
+
+    private String decideUserRole() {
+        return count() == 0 ? "ADMINISTRATOR" : "MERCHANT";
+    }
+
+    private User saveUserWithRole(User user, String role) {
+        Role userRole = new Role(role);
+        roleService.saveRole(userRole);
+        user.setRole(userRole);
+        user.setOperation(Objects.equals(role, "ADMINISTRATOR") ? Operation.UNLOCK : Operation.LOCK);
+        return saveUser(user);
+    }
+
+
+    // Helper methods for method - updateRole
+
+    private boolean isValidRole(String role) {
+        return role.equals("SUPPORT") || role.equals("MERCHANT");
+    }
+
+    private boolean isRoleAlreadyAssigned(User existingUser, String roleToBeAssigned) {
+        return existingUser.getRole().getName().equals(roleToBeAssigned);
+    }
+
+    // Helper methods for method - updateAccess
+
+    private boolean isAdministratorLocked(String targetUsername, Operation operation) {
+        User targetUser = findUserByUsername(targetUsername);
+        return isAdmin(targetUser) && operation == Operation.LOCK;
+    }
+
+    private boolean isUnauthorizedUnlock(Operation operation, User authenticatedUser) {
+        return operation == Operation.UNLOCK && !authenticatedUser.getRole().getName().equals("ADMINISTRATOR");
+    }
+
+    private void updateAccessOperation(String targetUsername, Operation operation) {
+        User targetUser = findUserByUsername(targetUsername);
+        targetUser.setOperation(operation);
+        saveUser(targetUser);
+    }
+
+    //Create the Response Body
+    private Map<String, String> createResponse(Operation operation, String targetUsername) {
+        // Prepare the response message
+        String status = (operation == Operation.LOCK) ? "locked" : "unlocked";
+        String responseMessage = "User " + targetUsername + " " + status + "!";
+
+        Map<String, String> responseBody = new HashMap<>();
+        responseBody.put("status", responseMessage);
+        return responseBody;
+    }
+
+    //Helper Methods for common methods
 
     public User findUserByUsername(String username) {
         Optional<User> optionalUser = userRepository.findByUsername(username);
@@ -132,25 +276,10 @@ public class UserService {
         return userRepository.count();
     }
 
-    @Transactional
-    public ResponseEntity<UserResponseDelete> deleteUser(String username) {
-        if (!userRepository.existsByUsernameIgnoreCase(username)) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-        User checkUser = findUserByUsername(username);
-        String roleName = checkUser.getRole().getName();
 
-        if (roleName.equals("ADMINISTRATOR")) {
-            System.out.println("An admin cannot delete oneself.");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-
-        userRepository.deleteByUsernameIgnoreCase(username);
-        return ResponseEntity.ok(new UserResponseDelete(username, "Deleted successfully!"));
-    }
-
-    public boolean existsByUsername(String name) {
-        return userRepository.existsByUsernameIgnoreCase(name);
+    public boolean isAdmin(User user) {
+        String roleName = user.getRole().getName();
+        return roleName.equals("ADMINISTRATOR");
     }
 
     @Bean
