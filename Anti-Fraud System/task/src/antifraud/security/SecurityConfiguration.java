@@ -1,6 +1,5 @@
-package antifraud.config;
+package antifraud.security;
 
-import antifraud.dao.userDao.UserDetailsServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,12 +15,23 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
-
+/**
+ * Configuration class for defining security policies and access rules.
+ */
     @Configuration
     @EnableWebSecurity
     public class SecurityConfiguration  {
 
-        @Bean
+    /**
+     * Configure the AuthenticationManager and set up user details retrieval.
+     *
+     * @param http               The HttpSecurity object.
+     * @param bCryptPasswordEncoder The BCryptPasswordEncoder for password hashing.
+     * @param userDetailsService The UserDetailsService for loading user details.
+     * @return An AuthenticationManager instance.
+     * @throws Exception If there is an error configuring the AuthenticationManager.
+     */
+    @Bean
     public AuthenticationManager authenticationManager(HttpSecurity http, BCryptPasswordEncoder bCryptPasswordEncoder, UserDetailsService userDetailsService)
             throws Exception {
         return http.getSharedObject(AuthenticationManagerBuilder.class)
@@ -31,12 +41,20 @@ import org.springframework.security.web.SecurityFilterChain;
                 .build();
     }
 
+
     private final UserDetailsServiceImpl userDetailsService;
         @Autowired
         public SecurityConfiguration(UserDetailsServiceImpl userDetailsService) {
             this.userDetailsService = userDetailsService;
         }
 
+    /**
+     * Define security filter chain for handling requests and access control.
+     *
+     * @param http The HttpSecurity object.
+     * @return A SecurityFilterChain instance.
+     * @throws Exception If there is an error configuring the security filter chain.
+     */
         @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
             http

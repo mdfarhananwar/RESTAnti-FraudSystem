@@ -1,4 +1,4 @@
-package antifraud.dao.userDao;
+package antifraud.security;
 
 import antifraud.models.userModel.Privilege;
 import antifraud.models.userModel.Role;
@@ -17,14 +17,30 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Implementation of the Spring Security UserDetailsService interface for loading user details during authentication.
+ */
 @Service("userDetailsService")
 @Transactional
 public class UserDetailsServiceImpl implements UserDetailsService {
     private final UserService userService;
 
+    /**
+     * Constructor to create an instance of UserDetailsServiceImpl with a UserService dependency.
+     *
+     * @param userService The UserService used to retrieve user details.
+     */
     public UserDetailsServiceImpl(UserService userService) {
         this.userService = userService;
     }
+
+    /**
+     * Load user details by username. This method is called during authentication.
+     *
+     * @param username The username of the user.
+     * @return UserDetails object containing user details.
+     * @throws UsernameNotFoundException If the user with the provided username is not found.
+     */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userService.findUserByUsername(username);
@@ -37,10 +53,22 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), grantedAuthorities);
     }
 
+    /**
+     * Get authorities (privileges) for a user based on their roles.
+     *
+     * @param roles A collection of roles assigned to the user.
+     * @return A collection of granted authorities (privileges).
+     */
     private Collection<? extends GrantedAuthority> getAuthorities(final Collection<Role> roles) {
         return getGrantedAuthorities(getPrivileges(roles));
     }
 
+    /**
+     * Get privileges associated with a collection of roles.
+     *
+     * @param roles A collection of roles.
+     * @return A list of privilege names.
+     */
     private List<String> getPrivileges(final Collection<Role> roles) {
         final List<String> privileges = new ArrayList<>();
         final List<Privilege> collection = new ArrayList<>();
@@ -55,6 +83,12 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         return privileges;
     }
 
+    /**
+     * Convert a list of privilege names into a list of GrantedAuthority objects.
+     *
+     * @param privileges A list of privilege names.
+     * @return A list of GrantedAuthority objects.
+     */
     private List<GrantedAuthority> getGrantedAuthorities(final List<String> privileges) {
         final List<GrantedAuthority> authorities = new ArrayList<>();
         for (final String privilege : privileges) {
